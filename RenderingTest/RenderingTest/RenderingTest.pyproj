@@ -4,7 +4,7 @@
     <SchemaVersion>2.0</SchemaVersion>
     <ProjectGuid>58133ec6-4caf-4e87-96d0-a81dce8ccd84</ProjectGuid>
     <ProjectHome>.</ProjectHome>
-    <StartupFile>RenderingTest.py</StartupFile>
+    <StartupFile>RenderingTestAPI.py</StartupFile>
     <SearchPath>
     </SearchPath>
     <WorkingDirectory>.</WorkingDirectory>
@@ -23,7 +23,9 @@
     <EnableUnmanagedDebugging>false</EnableUnmanagedDebugging>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="RenderingTest.py" />
+    <Compile Include="RenderingTestFrontend.py" />
+    <Compile Include="RenderingTestAPI.py" />
+    <Compile Include="RenderingTestLib.py" />
   </ItemGroup>
   <Import Project="$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)\Python Tools\Microsoft.PythonTools.targets" />
   <!-- Uncomment the CoreCompile target to enable the Build command in
