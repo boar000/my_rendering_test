@@ -1,0 +1,27 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.10.35027.167
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{888888A0-9F3D-457C-B088-3A5042F75D52}") = "RenderingTest", "RenderingTest\RenderingTest.pyproj", "{58133EC6-4CAF-4E87-96D0-A81DCE8CCD84}"
+EndProject
+Project("{888888A0-9F3D-457C-B088-3A5042F75D52}") = "TestImageGen", "TestImageGen\TestImageGen.pyproj", "{C1AE5CE2-BA81-457D-B5C3-92FFE6104BD5}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{58133EC6-4CAF-4E87-96D0-A81DCE8CCD84}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{58133EC6-4CAF-4E87-96D0-A81DCE8CCD84}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C1AE5CE2-BA81-457D-B5C3-92FFE6104BD5}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C1AE5CE2-BA81-457D-B5C3-92FFE6104BD5}.Release|Any CPU.ActiveCfg = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {C8B1CBFF-04DB-4631-9C78-6BFE52B09921}
+	EndGlobalSection
+EndGlobal
