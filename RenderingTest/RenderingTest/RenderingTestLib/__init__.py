@@ -50,6 +50,7 @@ class TestSummary:
         self.passed = []
         self.failed = []
         self.not_found = []
+        self.total_count = 0
 
 
 def load_reference_images():
@@ -95,6 +96,7 @@ def run_test(test:TestCase, items_by_name):
     result = TestSummary()
 
     not_found = list(items_by_name.keys())
+    result.total_count = len(not_found)
 
     for fname in os.listdir(test.raw_folder_path):
         name = os.path.basename(fname).replace(extension, '')

@@ -1,5 +1,6 @@
 ﻿
 from email.policy import default
+from turtle import color
 import RenderingTestLib as rt
 import os
 from textwrap import indent
@@ -61,8 +62,14 @@ with st.sidebar:
             st.session_state.latest_result = rt.run_test(test, st.session_state.items_by_name)
 
 
-    st.write("{}/{} passed test.".format(len(st.session_state.latest_result.passed), len(st.session_state.latest_result.passed) + len(st.session_state.latest_result.failed)))
+    st.write("{}/{} passed test.".format(len(st.session_state.latest_result.passed), st.session_state.latest_result.total_count))
 
+    if len(st.session_state.latest_result.failed) > 0:
+        st.write("failed : {}".format(len(st.session_state.latest_result.failed)))
+
+    if len(st.session_state.latest_result.not_found) > 0:
+        st.write("data not found : {}".format(len(st.session_state.latest_result.not_found)))
+        
     option = st.selectbox(
     "Sort by",
     ("Name", "Error"))
@@ -73,6 +80,8 @@ with st.sidebar:
     show_passed = st.checkbox("passed", value=True)
     show_failed = st.checkbox("failed", value=True)
     show_not_found = st.checkbox("not found", value=False)
+
+    st.divider()
 
     if option == 'Name':
         sorted_list = sorted(st.session_state.items_by_name.items(), key=lambda x: x[0])
@@ -94,25 +103,38 @@ with st.sidebar:
 
     for name, item in sorted_list:
         
+        is_passed = name in st.session_state.latest_result.passed
+        is_failed = name in st.session_state.latest_result.failed
+        is_not_found = name in st.session_state.latest_result.not_found
+        
         show = False
 
         if show_passed: 
-            if name in st.session_state.latest_result.passed:
+            if is_passed:
                 show = True
 
         if show_failed: 
-            if name in st.session_state.latest_result.failed:
+            if is_failed:
                 show = True
 
         if show_not_found: 
-            if name in st.session_state.latest_result.not_found:
+            if is_not_found:
                 show = True
         
         if show == False:
             continue
 
-        if st.button(name, key=name):
-            st.session_state.current_image = name
+        if is_failed:
+            if st.button(':red[{}]'.format(name), key=name):
+                st.session_state.current_image = name
+                
+        elif is_passed:
+            if st.button(':green[{}]'.format(name), key=name):
+                st.session_state.current_image = name
+
+        elif is_not_found:
+            if st.button(':gray[{}]'.format(name), key=name, disabled=True):
+                st.session_state.current_image = name
 
         lines = ["error {0:.6f}".format(item.error)]
         html_lines = "".join([f'<p style="margin:0; line-height:1.1;">{line}</p>' for line in lines])
@@ -127,7 +149,7 @@ with st.sidebar:
 
 
 st.write('--------')
-api_test = st.text_input('api test')
+api_test = st.text_input('api test : input test version here.')
 if api_test:
     res = requests.get("http://localhost:8000/test-ci/{}".format(test.name))
     st.write(res.json())
