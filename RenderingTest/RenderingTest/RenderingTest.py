@@ -12,7 +12,8 @@ from datetime import datetime, timedelta
 from collections import defaultdict
 
 directory = './images'
-
+reference_directory = directory + '/reference'
+extension = '.bmp'
 error_threshold = 0.01
 
 image_width = 800
@@ -24,7 +25,7 @@ class ImageObject:
         self.image = None
     
     def get_fullpath(self):
-        return directory + '/' + self.filepath
+        return self.filepath
 
     def load_image(self):
         fullpath = self.get_fullpath()
@@ -34,42 +35,70 @@ class ImageObject:
 
 class Item:
     def __init__(self) -> None:
-        self.error = None
+        self.error = 0.0
         self.error_map = None
-        self.images = []
+        self.reference = None
+        self.test = None
+        
+class TestCase:
+    def __init__(self, name:str, raw_folder_path:str, date:datetime) -> None:
+        self.name = name
+        self.raw_folder_path = raw_folder_path
+        self.date = date
 
+def run_test(test:TestCase):
+    for fname in os.listdir(test.raw_folder_path):
+        name = os.path.basename(fname).replace(extension, '')
+        
+        image = ImageObject(date_obj = None, filepath = os.path.join(test.raw_folder_path, fname))
+        image.load_image()
 
-# 状態を初期化
-if "current_image" not in st.session_state:
-    st.session_state.current_image = None
+        st.session_state.items_by_name[name].test = image
 
-if "items_by_name" not in st.session_state:
-    st.session_state.items_by_name = {}
-    pattern = re.compile(r"^(?P<name>.+)-(?P<date>\d{4}-\d{2}-\d{2}-\d{2}-\d{2}-\d{2})\.bmp$")
-    
-    for fname in os.listdir(directory):
-        match = pattern.match(fname)
-        if match:
-            name = match.group("name")
-            
-            if name not in st.session_state.items_by_name:
-                st.session_state.items_by_name[name] = Item()
+        item = st.session_state.items_by_name[name]
+        item.test = image
 
-            date_str = match.group("date")
-            d = datetime.strptime(date_str, "%Y-%m-%d-%H-%M-%S")
-            
-            st.session_state.items_by_name[name].images.append(ImageObject(date_obj = d, filepath = fname))
-            
-    for name, item in st.session_state.items_by_name.items():
-        # 日付でソート
-        item.images.sort(key=lambda x: x.date_obj, reverse=True)  
-        # 最新2イメージのみロード
-        item.images[0].load_image()
-        item.images[1].load_image()
-        flipErrorMap, meanFLIPError, parameters = flip.evaluate(item.images[0].get_fullpath(), item.images[1].get_fullpath(), "LDR")
+        flipErrorMap, meanFLIPError, parameters = flip.evaluate(
+            item.reference.get_fullpath(),
+            item.test.get_fullpath(), "LDR")
         item.error = meanFLIPError
         item.error_map = flipErrorMap
+
+# 状態を初期化
+if "is_initialized" not in st.session_state:
+    st.session_state.is_initialized = True
+
+    st.session_state.current_image = None
+    st.session_state.test_cases = []
+    st.session_state.items_by_name = {}
+    pattern = re.compile(r"^(?P<name>.+)-(?P<date>\d{4}-\d{2}-\d{2}-\d{2}-\d{2}-\d{2})$")
+    
+    for fname in os.listdir(reference_directory):
+        if fname.endswith(extension):
+            name = os.path.basename(fname).replace(extension, '')        
+            st.session_state.items_by_name[name] = Item()
+
+        image = ImageObject(date_obj = None, filepath = os.path.join(reference_directory, fname))
+        image.load_image()
         
+        st.session_state.items_by_name[name].reference = image
+
+
+    for childdir in os.listdir(directory):
+        childdirfull = os.path.join(directory, childdir)
+        if os.path.isdir(childdirfull):
+
+            match = pattern.match(childdir)
+            if match:
+                testname = match.group("name")
+                if name not in st.session_state.items_by_name:
+                    st.session_state.items_by_name[name] = Item()
+
+                date_str = match.group("date")
+                d = datetime.strptime(date_str, "%Y-%m-%d-%H-%M-%S")
+                
+                st.session_state.test_cases.append(TestCase(name=testname, raw_folder_path=childdirfull, date=d))
+
     
 # ページ設定（全幅レイアウト）
 st.set_page_config(layout="wide")
@@ -86,13 +115,18 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
+test = None
+
 with st.sidebar:
     
     st.header("Rendering Test")
 
+    test = st.selectbox("Version", tuple(p.name for p in st.session_state.test_cases))
+    
+
     option = st.selectbox(
-    "Sort Method",
-    ("Name", "Error", "Date / New", "Date / Old"))
+    "Sort by",
+    ("Name", "Error"))
     
     filter_text = st.text_input(
     "Filter")
@@ -101,10 +135,6 @@ with st.sidebar:
         sorted_list = sorted(st.session_state.items_by_name.items(), key=lambda x: x[0])
     elif option == 'Error':
         sorted_list = sorted(st.session_state.items_by_name.items(), key=lambda x: x[1].error)
-    elif option == 'Date / New':
-        sorted_list = sorted(st.session_state.items_by_name.items(), key=lambda x: x[1].images[0].date_obj, reverse=True)
-    elif option == 'Date / Old':
-        sorted_list = sorted(st.session_state.items_by_name.items(), key=lambda x: x[1].images[0].date_obj, reverse=False)
 
     if filter_text is not None and filter_text != '':
         sorted_list = filter(lambda x: filter_text in x[0], sorted_list)
@@ -114,17 +144,21 @@ with st.sidebar:
         if st.button(name, key=name):
             st.session_state.current_image = name
 
-        lines = ["{0:.6f} date:{1:}".format(item.error, item.images[0].date_obj.strftime('%Y/%m/%d %H:%M:%S'))]
+        lines = ["{0:.6f}".format(item.error)]
         html_lines = "".join([f'<p style="margin:0; line-height:1.1;">{line}</p>' for line in lines])
         st.markdown(html_lines, unsafe_allow_html=True)
 
-        st.image(item.images[0].image)
+        st.image(item.reference.image)
         
         if item.error < error_threshold:
             st.badge("Success", icon=":material/check:", color="green")
         else:
             st.badge("Fail", color="red")
 
+
+test = next((x for x in st.session_state.test_cases if x.name == test), None)
+if test != None:
+    run_test(test)
 
 if st.session_state.current_image in st.session_state.items_by_name.keys():
     
@@ -136,13 +170,14 @@ if st.session_state.current_image in st.session_state.items_by_name.keys():
 
     st.subheader('{}'.format(name))
     st.divider(width="stretch")
-    st.write('lhs:{} / rhs:{}'.format(item.images[0].filepath, item.images[1].filepath))
+    st.write('lhs:{} / rhs:{}'.format(item.reference.filepath, item.test.filepath))
     st.write('error:{0:.6f}'.format(item.error))
     
     image_comparison(
-    img1=item.images[0].image,
-    img2=item.images[1].image, width=image_width)
+    img1=item.reference.image,
+    img2=item.test.image, width=image_width)
 
-    st.image(item.error_map, width = image_width)
+    if item.error_map is not None:
+        st.image(item.error_map, width = image_width)
     
     
