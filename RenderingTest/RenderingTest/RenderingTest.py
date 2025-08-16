@@ -1,6 +1,7 @@
 ﻿
 from email.policy import default
 import os
+from textwrap import indent
 import numpy as np
 import re
 import cv2
@@ -10,6 +11,7 @@ import flip_evaluator as flip
 from streamlit_image_comparison import image_comparison
 from datetime import datetime, timedelta
 from collections import defaultdict
+#from streamlit_image_select import image_select
 
 directory = './images'
 reference_directory = directory + '/reference'
@@ -39,6 +41,10 @@ class Item:
         self.error_map = None
         self.reference = None
         self.test = None
+        self.passed = False
+        
+    def is_passed(self):
+        return self.error < error_threshold
         
 class TestCase:
     def __init__(self, name:str, raw_folder_path:str, date:datetime) -> None:
@@ -46,31 +52,60 @@ class TestCase:
         self.raw_folder_path = raw_folder_path
         self.date = date
 
+class TestSummary:
+    def __init__(self) -> None:
+        self.passed = []
+        self.failed = []
+        self.not_found = []
+
 def run_test(test:TestCase):
+    
+    result = TestSummary()
+
+    not_found = list(st.session_state.items_by_name.keys())
+
     for fname in os.listdir(test.raw_folder_path):
         name = os.path.basename(fname).replace(extension, '')
         
-        image = ImageObject(date_obj = None, filepath = os.path.join(test.raw_folder_path, fname))
-        image.load_image()
+        not_found.remove(name)
 
-        st.session_state.items_by_name[name].test = image
+        total = 0
+        passed = 0
 
-        item = st.session_state.items_by_name[name]
-        item.test = image
+        if name in st.session_state.items_by_name:
 
-        flipErrorMap, meanFLIPError, parameters = flip.evaluate(
-            item.reference.get_fullpath(),
-            item.test.get_fullpath(), "LDR")
-        item.error = meanFLIPError
-        item.error_map = flipErrorMap
+            image = ImageObject(date_obj = None, filepath = os.path.join(test.raw_folder_path, fname))
+            image.load_image()
+
+            st.session_state.items_by_name[name].test = image
+
+            item = st.session_state.items_by_name[name]
+            item.test = image
+
+            flipErrorMap, meanFLIPError, parameters = flip.evaluate(
+                item.reference.get_fullpath(),
+                item.test.get_fullpath(), "LDR")
+        
+            item.error = meanFLIPError
+            item.error_map = flipErrorMap
+
+            if item.is_passed():
+                result.passed.append(name)
+            else:
+                result.failed.append(name)
+              
+    result.not_found = not_found
+    return result  
+
 
 # 状態を初期化
 if "is_initialized" not in st.session_state:
     st.session_state.is_initialized = True
-
+    st.session_state.current_test = None
     st.session_state.current_image = None
     st.session_state.test_cases = []
     st.session_state.items_by_name = {}
+    st.session_state.latest_result = TestSummary()
     pattern = re.compile(r"^(?P<name>.+)-(?P<date>\d{4}-\d{2}-\d{2}-\d{2}-\d{2}-\d{2})$")
     
     for fname in os.listdir(reference_directory):
@@ -115,14 +150,20 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-test = None
 
 with st.sidebar:
     
     st.header("Rendering Test")
 
     test = st.selectbox("Version", tuple(p.name for p in st.session_state.test_cases))
-    
+    test = next((x for x in st.session_state.test_cases if x.name == test), None)
+    if test != None:
+        if st.session_state.current_test != test:
+            st.session_state.current_test = test
+            st.session_state.latest_result = run_test(test)
+
+
+    st.write("{}/{} passed test.".format(len(st.session_state.latest_result.passed), len(st.session_state.latest_result.passed) + len(st.session_state.latest_result.failed)))
 
     option = st.selectbox(
     "Sort by",
@@ -131,6 +172,10 @@ with st.sidebar:
     filter_text = st.text_input(
     "Filter")
     
+    show_passed = st.checkbox("passed", value=True)
+    show_failed = st.checkbox("failed", value=True)
+    show_not_found = st.checkbox("not found", value=False)
+
     if option == 'Name':
         sorted_list = sorted(st.session_state.items_by_name.items(), key=lambda x: x[0])
     elif option == 'Error':
@@ -139,26 +184,50 @@ with st.sidebar:
     if filter_text is not None and filter_text != '':
         sorted_list = filter(lambda x: filter_text in x[0], sorted_list)
 
+    #images = []
+    #captions = []
+    #
+    #for name, item in sorted_list:
+    #    images.append(item.reference.get_fullpath())
+    #    captions.append(name)
+    #    実用上問題ないかもしれないがimageを直接返すので例えば完全に同じバイト列が来た場合に正しくデータを特定できない    
+    #    selected = image_select(label='', images=images, captions=captions)
+
+
     for name, item in sorted_list:
         
+        show = False
+
+        if show_passed: 
+            if name in st.session_state.latest_result.passed:
+                show = True
+
+        if show_failed: 
+            if name in st.session_state.latest_result.failed:
+                show = True
+
+        if show_not_found: 
+            if name in st.session_state.latest_result.not_found:
+                show = True
+        
+        if show == False:
+            continue
+
         if st.button(name, key=name):
             st.session_state.current_image = name
 
-        lines = ["{0:.6f}".format(item.error)]
+        lines = ["error {0:.6f}".format(item.error)]
         html_lines = "".join([f'<p style="margin:0; line-height:1.1;">{line}</p>' for line in lines])
         st.markdown(html_lines, unsafe_allow_html=True)
 
         st.image(item.reference.image)
         
-        if item.error < error_threshold:
-            st.badge("Success", icon=":material/check:", color="green")
-        else:
-            st.badge("Fail", color="red")
+        #if item.error < error_threshold:
+        #    st.badge("Success", icon=":material/check:", color="green")
+        #else:
+        #    st.badge("Fail", color="red")
 
 
-test = next((x for x in st.session_state.test_cases if x.name == test), None)
-if test != None:
-    run_test(test)
 
 if st.session_state.current_image in st.session_state.items_by_name.keys():
     
