@@ -6,12 +6,18 @@ import time
 import flip_evaluator as flip
 from datetime import datetime, timedelta
 from collections import defaultdict
-#from streamlit_image_select import image_select
+from enum import Enum
 
 directory = './images'
 reference_directory = directory + '/reference'
 extension = '.bmp'
 error_threshold = 0.01
+
+class TestResult(Enum):
+    Unknown = 0
+    Passed = 1
+    Failed = 2
+    NotFound = 3
 
 class ImageObject:
     def __init__(self, date_obj: datetime = None, filepath: str = None) -> None:
@@ -34,10 +40,13 @@ class Item:
         self.error_map = None
         self.reference = None
         self.test = None
-        self.passed = False
+        self.result = TestResult.Unknown
         
-    def is_passed(self):
-        return self.error < error_threshold
+    def reset(self):
+        self.error = 0.0
+        self.error_map = None
+        self.test = None
+        self.result = TestResult.Unknown
         
 class TestCase:
     def __init__(self, name:str, raw_folder_path:str, date:datetime) -> None:
@@ -51,10 +60,15 @@ class TestSummary:
         self.failed = []
         self.not_found = []
         self.total_count = 0
+        
+    def reset(self):
+        self.passed = []
+        self.failed = []
+        self.not_found = []
+        self.total_count = 0
 
 
 def load_reference_images():
-    
     result = {}
 
     for fname in os.listdir(reference_directory):
@@ -91,24 +105,43 @@ def gather_test_cases():
 
     return test_cases
 
-def run_test(test:TestCase, items_by_name):
-    
-    result = TestSummary()
+def get_file_names(test:TestCase):
+    return os.listdir(test.raw_folder_path)
 
-    not_found = list(items_by_name.keys())
-    result.total_count = len(not_found)
-
-    for fname in os.listdir(test.raw_folder_path):
-        name = os.path.basename(fname).replace(extension, '')
+# Utility class for incremental test.
+#
+# Simplest usage. 
+#  context = IncrementalTestContext()
+#  context.initialize(test, items_by_name)
+#
+#  for file_name in context.file_names:
+#      context.run_test_incremental(test, file_name, items_by_name)
+#
+#
+class IncrementalTestContext:
+    def __init__(self) -> None:
+        self.file_names = []
+        self.test_summary = TestSummary()
         
-        not_found.remove(name)
+    def initialize(self, test:TestCase, items_by_name):
+        self.file_names = get_file_names(test)
+        
+        not_found = list(items_by_name.keys())
+        
+        self.test_summary.total_count = len(not_found)
+        self.test_summary.not_found = not_found
+
+    def run_test_incremental(self, test:TestCase, file_name:str, items_by_name):
+        name = os.path.basename(file_name).replace(extension, '')
+        
+        self.test_summary.not_found.remove(name)
 
         total = 0
         passed = 0
 
         if name in items_by_name:
 
-            image = ImageObject(date_obj = None, filepath = os.path.join(test.raw_folder_path, fname))
+            image = ImageObject(date_obj = None, filepath = os.path.join(test.raw_folder_path, file_name))
             image.load_image()
 
             items_by_name[name].test = image
@@ -123,11 +156,22 @@ def run_test(test:TestCase, items_by_name):
             item.error = meanFLIPError
             item.error_map = flipErrorMap
 
-            if item.is_passed():
-                result.passed.append(name)
+            if item.error < error_threshold:
+                self.test_summary.passed.append(name)
+                item.result = TestResult.Passed
             else:
-                result.failed.append(name)
+                self.test_summary.failed.append(name)
+                item.result = TestResult.Failed
               
-    result.not_found = not_found
-    return result  
+
+# Run a test.
+def run_test(test:TestCase, items_by_name):
     
+    context = IncrementalTestContext()
+    context.initialize(test, items_by_name)
+
+    for file_name in context.file_names:
+        context.run_test_incremental(test, file_name, items_by_name)
+        
+    return context.test_summary
+

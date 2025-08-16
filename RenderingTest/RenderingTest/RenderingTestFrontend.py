@@ -14,6 +14,10 @@ from datetime import datetime, timedelta
 from collections import defaultdict
 import requests
 
+@st.cache_data
+def load_reference_images():
+    return rt.load_reference_images()  
+
 directory = './images'
 reference_directory = directory + '/reference'
 extension = '.bmp'
@@ -30,7 +34,7 @@ if "is_initialized" not in st.session_state:
     st.session_state.items_by_name = {}
     st.session_state.latest_result = rt.TestSummary()
     
-    st.session_state.items_by_name = rt.load_reference_images()
+    st.session_state.items_by_name = load_reference_images()
     st.session_state.test_cases = rt.gather_test_cases()
 
     
@@ -54,21 +58,9 @@ with st.sidebar:
     
     st.header("Rendering Test")
 
+    status_text = st.empty()
+
     test = st.selectbox("Version", tuple(p.name for p in st.session_state.test_cases))
-    test = next((x for x in st.session_state.test_cases if x.name == test), None)
-    if test != None:
-        if st.session_state.current_test != test:
-            st.session_state.current_test = test
-            st.session_state.latest_result = rt.run_test(test, st.session_state.items_by_name)
-
-
-    st.write("{}/{} passed test.".format(len(st.session_state.latest_result.passed), st.session_state.latest_result.total_count))
-
-    if len(st.session_state.latest_result.failed) > 0:
-        st.write("failed : {}".format(len(st.session_state.latest_result.failed)))
-
-    if len(st.session_state.latest_result.not_found) > 0:
-        st.write("data not found : {}".format(len(st.session_state.latest_result.not_found)))
         
     option = st.selectbox(
     "Sort by",
@@ -77,11 +69,72 @@ with st.sidebar:
     filter_text = st.text_input(
     "Filter")
     
+    display_type = st.radio(
+    "Display type",
+    ["Test", "Reference"],
+    index=0,
+)
+
     show_passed = st.checkbox("passed", value=True)
     show_failed = st.checkbox("failed", value=True)
     show_not_found = st.checkbox("not found", value=False)
-
     st.divider()
+
+    passed_text = st.empty()
+    failed_text = st.empty()
+    not_found_text = st.empty()
+
+    test = next((x for x in st.session_state.test_cases if x.name == test), None)
+    if test != None:
+        if st.session_state.current_test != test:
+            st.session_state.current_test = test
+            st.session_state.latest_result.reset()
+
+            incremental_context = rt.IncrementalTestContext()
+            incremental_context.initialize(test, st.session_state.items_by_name)
+            
+            items_by_name = st.session_state.items_by_name
+            st.session_state.latest_result = incremental_context.test_summary
+
+            # initialize placeholders for showing progress.
+            progress_text_place_holders = []
+            progress_image_place_holders = []
+
+            for file_name in incremental_context.file_names:
+                progress_text_place_holders.append(st.empty())          
+                progress_image_place_holders.append(st.empty())           
+
+            i = 0
+            for file_name in incremental_context.file_names:
+                status_text.text(f"processing... {file_name}")
+                incremental_context.run_test_incremental(test, file_name, items_by_name)
+
+                passed_text.write("{}/{} passed test.".format(len(st.session_state.latest_result.passed), st.session_state.latest_result.total_count))
+
+                if len(st.session_state.latest_result.failed) > 0:
+                    failed_text.text("failed : {}".format(len(st.session_state.latest_result.failed)))
+
+                if len(st.session_state.latest_result.not_found) > 0:
+                    not_found_text.text("data not found : {}".format(len(st.session_state.latest_result.not_found)))
+                
+                name = file_name.replace(rt.extension, '')
+
+                if items_by_name[name].result == rt.TestResult.Passed:
+                    progress_text_place_holders[i].write(':green[{}]'.format(name))
+                elif items_by_name[name].result == rt.TestResult.Failed:
+                    progress_text_place_holders[i].write(':red[{}]'.format(name))
+                    
+                progress_image_place_holders[i].image(items_by_name[name].test.image)
+
+                i = i + 1
+                    
+            # clear placeholders for showing progress.
+            status_text.empty()
+            for itr in progress_text_place_holders:
+                itr.empty();
+            for itr in progress_image_place_holders:
+                itr.empty();
+
 
     if option == 'Name':
         sorted_list = sorted(st.session_state.items_by_name.items(), key=lambda x: x[0])
@@ -103,23 +156,20 @@ with st.sidebar:
 
     for name, item in sorted_list:
         
-        is_passed = name in st.session_state.latest_result.passed
-        is_failed = name in st.session_state.latest_result.failed
+        is_passed = item.result == rt.TestResult.Passed
+        is_failed = item.result == rt.TestResult.Failed
         is_not_found = name in st.session_state.latest_result.not_found
         
         show = False
+       
+        if show_passed and is_passed:
+            show = True
+        
+        if show_failed and is_failed:
+            show = True
 
-        if show_passed: 
-            if is_passed:
-                show = True
-
-        if show_failed: 
-            if is_failed:
-                show = True
-
-        if show_not_found: 
-            if is_not_found:
-                show = True
+        if show_not_found and is_not_found:
+            show = True
         
         if show == False:
             continue
@@ -140,18 +190,16 @@ with st.sidebar:
         html_lines = "".join([f'<p style="margin:0; line-height:1.1;">{line}</p>' for line in lines])
         st.markdown(html_lines, unsafe_allow_html=True)
 
-        st.image(item.reference.image)
-        
-        #if item.error < error_threshold:
-        #    st.badge("Success", icon=":material/check:", color="green")
-        #else:
-        #    st.badge("Fail", color="red")
+        if display_type == "Reference":
+            st.image(item.reference.image)
+        elif display_type == "Test":
+            st.image(item.test.image)
 
 
 st.write('--------')
 api_test = st.text_input('api test : input test version here.')
 if api_test:
-    res = requests.get("http://localhost:8000/test-ci/{}".format(test.name))
+    res = requests.get("http://localhost:8000/test-ci/{}".format(api_test))
     st.write(res.json())
 
 if st.session_state.current_image in st.session_state.items_by_name.keys():
