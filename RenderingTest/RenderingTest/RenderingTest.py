@@ -97,6 +97,34 @@ def run_test(test:TestCase):
     result.not_found = not_found
     return result  
 
+def load_reference_images():
+    for fname in os.listdir(reference_directory):
+        if fname.endswith(extension):
+            name = os.path.basename(fname).replace(extension, '')        
+            st.session_state.items_by_name[name] = Item()
+
+        image = ImageObject(date_obj = None, filepath = os.path.join(reference_directory, fname))
+        image.load_image()
+        
+        st.session_state.items_by_name[name].reference = image   
+
+def gather_test_cases():
+    pattern = re.compile(r"^(?P<name>.+)-(?P<date>\d{4}-\d{2}-\d{2}-\d{2}-\d{2}-\d{2})$")
+    
+    for childdir in os.listdir(directory):
+        childdirfull = os.path.join(directory, childdir)
+        if os.path.isdir(childdirfull):
+
+            match = pattern.match(childdir)
+            if match:
+                testname = match.group("name")
+                #if name not in st.session_state.items_by_name:
+                #    st.session_state.items_by_name[name] = Item()
+
+                date_str = match.group("date")
+                d = datetime.strptime(date_str, "%Y-%m-%d-%H-%M-%S")
+                
+                st.session_state.test_cases.append(TestCase(name=testname, raw_folder_path=childdirfull, date=d))
 
 # 状態を初期化
 if "is_initialized" not in st.session_state:
@@ -106,33 +134,9 @@ if "is_initialized" not in st.session_state:
     st.session_state.test_cases = []
     st.session_state.items_by_name = {}
     st.session_state.latest_result = TestSummary()
-    pattern = re.compile(r"^(?P<name>.+)-(?P<date>\d{4}-\d{2}-\d{2}-\d{2}-\d{2}-\d{2})$")
     
-    for fname in os.listdir(reference_directory):
-        if fname.endswith(extension):
-            name = os.path.basename(fname).replace(extension, '')        
-            st.session_state.items_by_name[name] = Item()
-
-        image = ImageObject(date_obj = None, filepath = os.path.join(reference_directory, fname))
-        image.load_image()
-        
-        st.session_state.items_by_name[name].reference = image
-
-
-    for childdir in os.listdir(directory):
-        childdirfull = os.path.join(directory, childdir)
-        if os.path.isdir(childdirfull):
-
-            match = pattern.match(childdir)
-            if match:
-                testname = match.group("name")
-                if name not in st.session_state.items_by_name:
-                    st.session_state.items_by_name[name] = Item()
-
-                date_str = match.group("date")
-                d = datetime.strptime(date_str, "%Y-%m-%d-%H-%M-%S")
-                
-                st.session_state.test_cases.append(TestCase(name=testname, raw_folder_path=childdirfull, date=d))
+    load_reference_images()
+    gather_test_cases()
 
     
 # ページ設定（全幅レイアウト）
@@ -239,7 +243,7 @@ if st.session_state.current_image in st.session_state.items_by_name.keys():
 
     st.subheader('{}'.format(name))
     st.divider(width="stretch")
-    st.write('lhs:{} / rhs:{}'.format(item.reference.filepath, item.test.filepath))
+    st.write('test:{}'.format(item.test.filepath).replace('\\', '/'))
     st.write('error:{0:.6f}'.format(item.error))
     
     image_comparison(
