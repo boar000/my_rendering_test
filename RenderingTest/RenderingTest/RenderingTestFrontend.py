@@ -13,6 +13,11 @@ from streamlit_image_comparison import image_comparison
 from datetime import datetime, timedelta
 from collections import defaultdict
 import requests
+import base64
+import io
+from PIL import Image
+
+st.set_page_config(layout="wide")
 
 @st.cache_data
 def load_reference_images():
@@ -24,6 +29,12 @@ extension = '.bmp'
 error_threshold = 0.01
 
 image_width = 800
+
+def to_img_tag(image:rt.ImageObject):
+    buf = io.BytesIO()
+    image.save(buf, format="PNG")
+    b64 = base64.b64encode(buf.getvalue()).decode()
+    return f'<img src="data:image/png;base64,{b64}"/>'
 
 # 状態を初期化
 if "is_initialized" not in st.session_state:
@@ -53,6 +64,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
+sorted_list = None
 
 with st.sidebar:
     
@@ -99,7 +111,6 @@ with st.sidebar:
             # initialize placeholders for showing progress.
             progress_text_place_holders = []
             progress_image_place_holders = []
-
             for file_name in incremental_context.file_names:
                 progress_text_place_holders.append(st.empty())          
                 progress_image_place_holders.append(st.empty())           
@@ -107,8 +118,12 @@ with st.sidebar:
             i = 0
             for file_name in incremental_context.file_names:
                 status_text.text(f"processing... {file_name}")
+                
+                # Evaluate diff one by one.
                 incremental_context.run_test_incremental(test, file_name, items_by_name)
 
+
+                # The blocks below are only for displaying progress and are not related to the actual processing itself.
                 passed_text.write("{}/{} passed test.".format(len(st.session_state.latest_result.passed), st.session_state.latest_result.total_count))
 
                 if len(st.session_state.latest_result.failed) > 0:
@@ -201,21 +216,75 @@ api_test = st.text_input('api test : input test version here.')
 if api_test:
     res = requests.get("http://localhost:8000/test-ci/{}".format(api_test))
     st.write(res.json())
+    
+c0, c1 = st.columns(2)
 
-if st.session_state.current_image in st.session_state.items_by_name.keys():
-    
-    name = st.session_state.current_image
-    item = st.session_state.items_by_name[name]
-    
-    st.subheader('{}'.format(name))
-    st.write('test:{}'.format(item.test.filepath).replace('\\', '/'))
-    st.write('error:{0:.6f}'.format(item.error))
-    
-    image_comparison(
-    img1=item.reference.image,
-    img2=item.test.image, width=image_width)
+if sorted_list is not None:
 
-    if item.error_map is not None:
-        st.image(item.error_map, width = image_width)
+    c0.html(
+        """
+        <style>
+        .gallery {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+        }
+        .gallery-item {
+            background: #fff;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+        }
+        .gallery-item img {
+            width: 100%;
+            height: auto;
+            display: block;
+        }
+        .caption {
+            padding: 0.5rem;
+            text-align: center;
+            font-weight: bold;
+            color: black;
+        }
+        .caption.red { background-color: #e74c3c; }
+        .caption.blue { background-color: #3498db; }
+        .caption.green { background-color: #27ae60; }
+        .caption.purple { background-color: #9b59b6; }
+        </style>
+        """
+    )
+
+gallery_html = '<div class="gallery">'
+for name, item in sorted_list:
+    if item.test != None:
+        gallery_html += f"""
+            <div class="gallery-item">
+                <div class="caption">{name}</div>
+                {to_img_tag(item.test.image)}
+            </div>
+        """
+gallery_html += "</div>"
+
+# まとめて埋め込み
+c0.html(gallery_html)
+
+
+with c1:
+
+    if st.session_state.current_image in st.session_state.items_by_name.keys():
+    
+        name = st.session_state.current_image
+        item = st.session_state.items_by_name[name]
+    
+        st.subheader('{}'.format(name))
+        st.write('test:{}'.format(item.test.filepath).replace('\\', '/'))
+        st.write('error:{0:.6f}'.format(item.error))
+    
+        image_comparison(
+        img1=item.reference.image,
+        img2=item.test.image, width=image_width)
+
+        if item.error_map is not None:
+            st.image(item.error_map, width = image_width)
     
     

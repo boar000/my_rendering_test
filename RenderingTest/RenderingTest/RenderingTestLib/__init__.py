@@ -7,6 +7,7 @@ import flip_evaluator as flip
 from datetime import datetime, timedelta
 from collections import defaultdict
 from enum import Enum
+from PIL import Image
 
 directory = './images'
 reference_directory = directory + '/reference'
@@ -32,7 +33,7 @@ class ImageObject:
         fullpath = self.get_fullpath()
         img = cv2.imread(fullpath)
         self.image = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-        self.image = np.asarray(self.image)
+        self.image = Image.fromarray(self.image)
 
 class Item:
     def __init__(self) -> None:
