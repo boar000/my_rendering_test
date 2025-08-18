@@ -4,7 +4,7 @@
     <SchemaVersion>2.0</SchemaVersion>
     <ProjectGuid>58133ec6-4caf-4e87-96d0-a81dce8ccd84</ProjectGuid>
     <ProjectHome>.</ProjectHome>
-    <StartupFile>RenderingTestAPI.py</StartupFile>
+    <StartupFile>RenderingTestLib\__init__.py</StartupFile>
     <SearchPath>
     </SearchPath>
     <WorkingDirectory>.</WorkingDirectory>
@@ -25,7 +25,14 @@
   <ItemGroup>
     <Compile Include="RenderingTestFrontend.py" />
     <Compile Include="RenderingTestAPI.py" />
-    <Compile Include="RenderingTestLib.py" />
+    <Compile Include="RenderingTestLib\__init__.py" />
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="RenderingTestLib\" />
+    <Folder Include="RenderingTestLib\__pycache__\" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="RenderingTestLib\__pycache__\__init__.cpython-313.pyc" />
   </ItemGroup>
   <Import Project="$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)\Python Tools\Microsoft.PythonTools.targets" />
   <!-- Uncomment the CoreCompile target to enable the Build command in

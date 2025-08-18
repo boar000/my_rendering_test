@@ -3,12 +3,14 @@ import numpy as np
 import re
 import cv2
 import time
+import json
 import flip_evaluator as flip
+import pickle
 from datetime import datetime, timedelta
 from collections import defaultdict
 from enum import Enum
 
-directory = './images'
+directory = './static/images'
 reference_directory = directory + '/reference'
 extension = '.bmp'
 error_threshold = 0.01
@@ -19,11 +21,15 @@ class TestResult(Enum):
     Failed = 2
     NotFound = 3
 
+def convert_image_name(file_path):
+    return os.path.basename(file_path).replace(extension, '')    
+
 class ImageObject:
     def __init__(self, date_obj: datetime = None, filepath: str = None) -> None:
         self.date_obj = date_obj
         self.filepath = filepath
         self.image = None
+        self.thumbnail = None
     
     def get_fullpath(self):
         return self.filepath
@@ -32,7 +38,26 @@ class ImageObject:
         fullpath = self.get_fullpath()
         img = cv2.imread(fullpath)
         self.image = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-        self.image = np.asarray(self.image)
+        self.create_thumbnail_if_not_exists()
+
+    def create_thumbnail_if_not_exists(self):
+        thumb_dir = os.path.join(directory, os.path.basename(os.path.dirname(self.get_fullpath())), 'thumbnails')
+        dst_path = os.path.join(thumb_dir, convert_image_name(self.filepath) + '.jpg')
+
+        if os.path.isfile(dst_path) == False:
+            os.makedirs(thumb_dir, exist_ok=True)
+
+            fullpath = self.get_fullpath()
+            img = cv2.imread(fullpath)
+            cv2.imwrite(dst_path, img)
+            
+    def get_thumbnail_url(self):
+        self.create_thumbnail_if_not_exists()
+
+        thumb_dir = os.path.join(directory, os.path.basename(os.path.dirname(self.get_fullpath())), 'thumbnails')
+        dst_path = os.path.join(thumb_dir, convert_image_name(self.filepath) + '.jpg')
+
+        return dst_path.replace('\\', '/')
 
 class Item:
     def __init__(self) -> None:
@@ -66,7 +91,20 @@ class TestSummary:
         self.failed = []
         self.not_found = []
         self.total_count = 0
-
+        
+    def save(self, file_path):
+        with open(file_path, "w") as file:
+            obj = { 'passed':self.passed, 'failed':self.failed, 'not_found':self.not_found,  }
+            json.dump(obj, file, indent=4)
+    
+    def load(self, file_path):
+        with open(file_path, "r") as f:
+            data = json.load(f)
+            self.passed = data['passed']
+            self.failed = data['failed']
+            self.not_found = data['not_found']
+            self.total_count = len(self.passed) + len(self.failed) + len(self.not_found) 
+        
 
 def load_reference_images():
     result = {}
@@ -76,10 +114,10 @@ def load_reference_images():
             name = os.path.basename(fname).replace(extension, '')        
             result[name] = Item()
 
-        image = ImageObject(date_obj = None, filepath = os.path.join(reference_directory, fname))
-        image.load_image()
+            image = ImageObject(date_obj = None, filepath = os.path.join(reference_directory, fname))
+            image.load_image()
         
-        result[name].reference = image
+            result[name].reference = image
     
     return result
 
@@ -106,7 +144,7 @@ def gather_test_cases():
     return test_cases
 
 def get_file_names(test:TestCase):
-    return os.listdir(test.raw_folder_path)
+    return list(filter(lambda x: x.endswith(extension), os.listdir(test.raw_folder_path)))
 
 # Utility class for incremental test.
 #
@@ -172,6 +210,14 @@ def run_test(test:TestCase, items_by_name):
 
     for file_name in context.file_names:
         context.run_test_incremental(test, file_name, items_by_name)
-        
+    
     return context.test_summary
 
+
+if __name__ == '__main__':
+    a = load_reference_images()
+    test = gather_test_cases()[0]
+    result = run_test(test, a)
+    result.save(os.path.join(test.raw_folder_path, "report.json"))
+    result.load(os.path.join(test.raw_folder_path, "report.json"))
+    

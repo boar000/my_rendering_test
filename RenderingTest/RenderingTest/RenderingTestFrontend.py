@@ -18,11 +18,6 @@ import requests
 def load_reference_images():
     return rt.load_reference_images()  
 
-directory = './images'
-reference_directory = directory + '/reference'
-extension = '.bmp'
-error_threshold = 0.01
-
 image_width = 800
 
 # 状態を初期化
@@ -88,52 +83,60 @@ with st.sidebar:
     if test != None:
         if st.session_state.current_test != test:
             st.session_state.current_test = test
-            st.session_state.latest_result.reset()
-
-            incremental_context = rt.IncrementalTestContext()
-            incremental_context.initialize(test, st.session_state.items_by_name)
             
-            items_by_name = st.session_state.items_by_name
-            st.session_state.latest_result = incremental_context.test_summary
-
-            # initialize placeholders for showing progress.
-            progress_text_place_holders = []
-            progress_image_place_holders = []
-
-            for file_name in incremental_context.file_names:
-                progress_text_place_holders.append(st.empty())          
-                progress_image_place_holders.append(st.empty())           
-
-            i = 0
-            for file_name in incremental_context.file_names:
-                status_text.text(f"processing... {file_name}")
-                incremental_context.run_test_incremental(test, file_name, items_by_name)
-
-                passed_text.write("{}/{} passed test.".format(len(st.session_state.latest_result.passed), st.session_state.latest_result.total_count))
-
-                if len(st.session_state.latest_result.failed) > 0:
-                    failed_text.text("failed : {}".format(len(st.session_state.latest_result.failed)))
-
-                if len(st.session_state.latest_result.not_found) > 0:
-                    not_found_text.text("data not found : {}".format(len(st.session_state.latest_result.not_found)))
+            if os.path.exists(os.path.join(test.raw_folder_path, "report.json")) == True:
+                st.session_state.latest_result.reset()
+                st.session_state.latest_result.load(os.path.join(test.raw_folder_path, "report.json"))
                 
-                name = file_name.replace(rt.extension, '')
+            else:
+                st.session_state.latest_result.reset()
 
-                if items_by_name[name].result == rt.TestResult.Passed:
-                    progress_text_place_holders[i].write(':green[{}]'.format(name))
-                elif items_by_name[name].result == rt.TestResult.Failed:
-                    progress_text_place_holders[i].write(':red[{}]'.format(name))
-                    
-                progress_image_place_holders[i].image(items_by_name[name].test.image)
+                incremental_context = rt.IncrementalTestContext()
+                incremental_context.initialize(test, st.session_state.items_by_name)
+            
+                items_by_name = st.session_state.items_by_name
+                st.session_state.latest_result = incremental_context.test_summary
 
-                i = i + 1
+                # initialize placeholders for showing progress.
+                progress_text_place_holders = []
+                progress_image_place_holders = []
+
+                for file_name in incremental_context.file_names:
+                    progress_text_place_holders.append(st.empty())          
+                    progress_image_place_holders.append(st.empty())           
+
+                i = 0
+                for file_name in incremental_context.file_names:
+                    status_text.text(f"processing... {file_name}")
+                    incremental_context.run_test_incremental(test, file_name, items_by_name)
+
+                    passed_text.write("{}/{} passed test.".format(len(st.session_state.latest_result.passed), st.session_state.latest_result.total_count))
+
+                    if len(st.session_state.latest_result.failed) > 0:
+                        failed_text.text("failed : {}".format(len(st.session_state.latest_result.failed)))
+
+                    if len(st.session_state.latest_result.not_found) > 0:
+                        not_found_text.text("data not found : {}".format(len(st.session_state.latest_result.not_found)))
+                
+                    name = file_name.replace(rt.extension, '')
+
+                    if items_by_name[name].result == rt.TestResult.Passed:
+                        progress_text_place_holders[i].write(':green[{}]'.format(name))
+                    elif items_by_name[name].result == rt.TestResult.Failed:
+                        progress_text_place_holders[i].write(':red[{}]'.format(name))
                     
-            # clear placeholders for showing progress.
-            status_text.empty()
-            for itr in progress_text_place_holders:
-                itr.empty();
-            for itr in progress_image_place_holders:
-                itr.empty();
+                    progress_image_place_holders[i].image(items_by_name[name].test.image)
+
+                    i = i + 1
+
+                st.session_state.latest_result.save(os.path.join(test.raw_folder_path, "report.json"))
+                    
+                # clear placeholders for showing progress.
+                status_text.empty()
+                for itr in progress_text_place_holders:
+                    itr.empty();
+                for itr in progress_image_place_holders:
+                    itr.empty();
 
 
     if option == 'Name':
@@ -191,9 +194,9 @@ with st.sidebar:
         st.markdown(html_lines, unsafe_allow_html=True)
 
         if display_type == "Reference":
-            st.image(item.reference.image)
+            st.image(item.reference.get_thumbnail_url())
         elif display_type == "Test":
-            st.image(item.test.image)
+            st.image(item.test.get_thumbnail_url())
 
 
 st.write('--------')
