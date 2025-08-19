@@ -30,6 +30,9 @@ class ImageObject:
         self.filepath = filepath
         self.image = None
         self.thumbnail = None
+        self.error = 0.0
+        self.error_map = None
+        self.result = TestResult.Unknown
     
     def get_fullpath(self):
         return self.filepath
@@ -61,17 +64,12 @@ class ImageObject:
 
 class Item:
     def __init__(self) -> None:
-        self.error = 0.0
-        self.error_map = None
+
         self.reference = None
         self.test = None
-        self.result = TestResult.Unknown
         
     def reset(self):
-        self.error = 0.0
-        self.error_map = None
         self.test = None
-        self.result = TestResult.Unknown
         
 class TestCase:
     def __init__(self, name:str, raw_folder_path:str, date:datetime) -> None:
@@ -191,15 +189,15 @@ class IncrementalTestContext:
                 item.reference.get_fullpath(),
                 item.test.get_fullpath(), "LDR")
         
-            item.error = meanFLIPError
-            item.error_map = flipErrorMap
+            item.test.error = meanFLIPError
+            item.test.error_map = flipErrorMap
 
-            if item.error < error_threshold:
+            if item.test.error < error_threshold:
                 self.test_summary.passed.append(name)
-                item.result = TestResult.Passed
+                item.test.result = TestResult.Passed
             else:
                 self.test_summary.failed.append(name)
-                item.result = TestResult.Failed
+                item.test.result = TestResult.Failed
               
 
 # Run a test.

@@ -88,6 +88,16 @@ with st.sidebar:
                 st.session_state.latest_result.reset()
                 st.session_state.latest_result.load(os.path.join(test.raw_folder_path, "report.json"))
                 
+                result = st.session_state.latest_result
+                for name, item in st.session_state.items_by_name.items():
+                    item.test = rt.ImageObject(date_obj = None, filepath = os.path.join(test.raw_folder_path, name + rt.extension))
+                    item.result = rt.TestResult.NotFound
+                    
+                    if name in result.passed:
+                        item.result = rt.TestResult.Passed
+                    if name in result.failed:
+                        item.result = rt.TestResult.Failed
+                
             else:
                 st.session_state.latest_result.reset()
 
@@ -142,7 +152,7 @@ with st.sidebar:
     if option == 'Name':
         sorted_list = sorted(st.session_state.items_by_name.items(), key=lambda x: x[0])
     elif option == 'Error':
-        sorted_list = sorted(st.session_state.items_by_name.items(), key=lambda x: x[1].error)
+        sorted_list = sorted(st.session_state.items_by_name.items(), key=lambda x: x[1].test.error)
 
     if filter_text is not None and filter_text != '':
         sorted_list = filter(lambda x: filter_text in x[0], sorted_list)
@@ -156,9 +166,7 @@ with st.sidebar:
     #    実用上問題ないかもしれないがimageを直接返すので例えば完全に同じバイト列が来た場合に正しくデータを特定できない    
     #    selected = image_select(label='', images=images, captions=captions)
 
-
     for name, item in sorted_list:
-        
         is_passed = item.result == rt.TestResult.Passed
         is_failed = item.result == rt.TestResult.Failed
         is_not_found = name in st.session_state.latest_result.not_found
@@ -189,14 +197,17 @@ with st.sidebar:
             if st.button(':gray[{}]'.format(name), key=name, disabled=True):
                 st.session_state.current_image = name
 
-        lines = ["error {0:.6f}".format(item.error)]
+        lines = ["error {0:.6f}".format(item.test.error)]
         html_lines = "".join([f'<p style="margin:0; line-height:1.1;">{line}</p>' for line in lines])
         st.markdown(html_lines, unsafe_allow_html=True)
 
         if display_type == "Reference":
             st.image(item.reference.get_thumbnail_url())
         elif display_type == "Test":
-            st.image(item.test.get_thumbnail_url())
+            if item.result == rt.TestResult.NotFound:
+                st.image(item.reference.get_thumbnail_url())
+            else:
+                st.image(item.test.get_thumbnail_url())
 
 
 st.write('--------')
@@ -212,13 +223,13 @@ if st.session_state.current_image in st.session_state.items_by_name.keys():
     
     st.subheader('{}'.format(name))
     st.write('test:{}'.format(item.test.filepath).replace('\\', '/'))
-    st.write('error:{0:.6f}'.format(item.error))
+    st.write('error:{0:.6f}'.format(item.test.error))
     
     image_comparison(
-    img1=item.reference.image,
-    img2=item.test.image, width=image_width)
+    img1=item.reference.get_thumbnail_url(),
+    img2=item.test.get_thumbnail_url(), width=image_width)
 
-    if item.error_map is not None:
-        st.image(item.error_map, width = image_width)
+    if item.test.error_map is not None:
+        st.image(item.test.error_map, width = image_width)
     
     
