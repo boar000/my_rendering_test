@@ -191,6 +191,41 @@ with st.sidebar:
     #    実用上問題ないかもしれないがimageを直接返すので例えば完全に同じバイト列が来た場合に正しくデータを特定できない    
     #    selected = image_select(label='', images=images, captions=captions)
 
+    st.html(
+    """
+    <style>
+    .gallery {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1rem;
+    }
+    .gallery-item {
+        background: #fff;
+        border-radius: 8px;
+        overflow: hidden;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+    }
+    .gallery-item img {
+        width: 100%;
+        height: auto;
+        display: block;
+    }
+    .caption {
+        padding: 0.5rem;
+        text-align: center;
+        font-weight: bold;
+        color: black;
+    }
+    .caption.red { background-color: #e74c3c; }
+    .caption.blue { background-color: #3498db; }
+    .caption.green { background-color: #27ae60; }
+    .caption.purple { background-color: #9b59b6; }
+    </style>
+    """
+    )
+    
+    gallery_html = '<div class="gallery">'
+
     for name, item in sorted_list:
         is_passed = item.result == rt.TestResult.Passed
         is_failed = item.result == rt.TestResult.Failed
@@ -210,6 +245,7 @@ with st.sidebar:
         if show == False:
             continue
 
+        b = '''
         if is_failed:
             if st.button(':red[{}]'.format(name), key=name):
                 st.session_state.current_image = name
@@ -221,7 +257,16 @@ with st.sidebar:
         elif is_not_found:
             if st.button(':gray[{}]'.format(name), key=name, disabled=True):
                 st.session_state.current_image = name
+        '''
 
+        gallery_html += f"""
+            <div class="gallery-item">
+                <!--<div class="caption">name</div>-->
+                <img src="https://cdn.britannica.com/34/235834-050-C5843610/two-different-breeds-of-cats-side-by-side-outdoors-in-the-garden.jpg?w=300" />
+            </div>
+        """
+
+        tmp = '''
         lines = ["error {0:.6f}".format(item.test.error)]
         html_lines = "".join([f'<p style="margin:0; line-height:1.1;">{line}</p>' for line in lines])
         st.markdown(html_lines, unsafe_allow_html=True)
@@ -234,6 +279,9 @@ with st.sidebar:
             else:
                 st.image(item.test.get_thumbnail_url())
 
+        '''
+    gallery_html += "</div>"
+    st.html(gallery_html)
 
 
 st.write('--------')
