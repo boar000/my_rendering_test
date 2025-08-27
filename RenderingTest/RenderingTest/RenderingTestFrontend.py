@@ -13,6 +13,7 @@ from streamlit_image_comparison import image_comparison
 from datetime import datetime, timedelta
 from collections import defaultdict
 import requests
+from st_click_detector import click_detector
 
 @st.cache_data
 def load_reference_images():
@@ -191,8 +192,7 @@ with st.sidebar:
     #    実用上問題ないかもしれないがimageを直接返すので例えば完全に同じバイト列が来た場合に正しくデータを特定できない    
     #    selected = image_select(label='', images=images, captions=captions)
 
-    st.html(
-    """
+    gallery_html = """
     <style>
     .gallery {
         display: grid;
@@ -200,10 +200,9 @@ with st.sidebar:
         gap: 1rem;
     }
     .gallery-item {
-        background: #fff;
-        border-radius: 8px;
+        background: #000;
+        border-radius: 2px;
         overflow: hidden;
-        box-shadow: 0 2px 6px rgba(0,0,0,0.1);
     }
     .gallery-item img {
         width: 100%;
@@ -211,10 +210,8 @@ with st.sidebar:
         display: block;
     }
     .caption {
-        padding: 0.5rem;
         text-align: center;
-        font-weight: bold;
-        color: black;
+        color: white;
     }
     .caption.red { background-color: #e74c3c; }
     .caption.blue { background-color: #3498db; }
@@ -222,9 +219,8 @@ with st.sidebar:
     .caption.purple { background-color: #9b59b6; }
     </style>
     """
-    )
     
-    gallery_html = '<div class="gallery">'
+    gallery_html += '<div class="gallery">'
 
     for name, item in sorted_list:
         is_passed = item.result == rt.TestResult.Passed
@@ -259,12 +255,23 @@ with st.sidebar:
                 st.session_state.current_image = name
         '''
 
+        disp_image = None
+        if display_type == "Reference":
+            disp_image = item.reference
+        elif display_type == "Test":
+            disp_image = item.Test
+            if disp_image == None:
+                disp_image = item.reference
+
         gallery_html += f"""
-            <div class="gallery-item">
-                <!--<div class="caption">name</div>-->
-                <img src="https://cdn.britannica.com/34/235834-050-C5843610/two-different-breeds-of-cats-side-by-side-outdoors-in-the-garden.jpg?w=300" />
-            </div>
+            <a href='#' id='{name}'>
+                <div class="gallery-item" onclick="selectItem('cat2')">
+                    <div class="caption">{name}</div>
+                    <img src="{disp_image.get_thumbnail_url().replace("./static/","http://localhost:8501/app/static/" )}" />
+                </div>
+            </a>
         """
+
 
         tmp = '''
         lines = ["error {0:.6f}".format(item.test.error)]
@@ -281,8 +288,9 @@ with st.sidebar:
 
         '''
     gallery_html += "</div>"
-    st.html(gallery_html)
 
+    clicked = click_detector(gallery_html)
+    st.session_state.current_image = clicked
 
 st.write('--------')
 api_test = st.text_input('api test : input test version here.')
