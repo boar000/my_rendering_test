@@ -259,8 +259,9 @@ with st.sidebar:
         if display_type == "Reference":
             disp_image = item.reference
         elif display_type == "Test":
-            disp_image = item.Test
-            if disp_image == None:
+            if item.test.image != None:    
+                disp_image = item.test
+            else:
                 disp_image = item.reference
 
         gallery_html += f"""
