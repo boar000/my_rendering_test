@@ -48,6 +48,18 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
+st.html(
+    """
+    <style>
+    /* サイドバー全体の幅 */
+    [data-testid="stSidebar"] {
+        min-width: 400px;  /* デフォルトはおよそ 250px */
+        max-width: 120000px;
+    }
+    </style>
+    """
+)
+
 
 with st.sidebar:
     
@@ -55,24 +67,37 @@ with st.sidebar:
 
     status_text = st.empty()
 
-    test = st.selectbox("Version", tuple(p.name for p in st.session_state.test_cases))
-        
-    option = st.selectbox(
-    "Sort by",
-    ("Name", "Error"))
-    
-    filter_text = st.text_input(
-    "Filter")
-    
-    display_type = st.radio(
-    "Display type",
-    ["Test", "Reference"],
-    index=0,
-)
 
-    show_passed = st.checkbox("passed", value=True)
-    show_failed = st.checkbox("failed", value=True)
-    show_not_found = st.checkbox("not found", value=False)
+    test = st.selectbox("Version", tuple(p.name for p in st.session_state.test_cases))
+
+    c0, c1 = st.columns(2)
+    with c0:
+        st.text('Sort by')
+    with c1:
+        option = st.selectbox(
+        "Sort by",
+        ("Name", "Error"), label_visibility='collapsed')
+
+
+    c0, c1 = st.columns(2)
+    with c0:
+        st.text('Filter')
+    with c1:
+        filter_text = st.text_input(
+        "Filter", label_visibility='collapsed')
+
+    display_type = st.radio(
+        "Thunbnail",
+        ["Test", "Reference"],
+        index=0, label_visibility='collapsed')
+
+    c0, c1, c2 = st.columns(3)
+    with c0:
+        show_passed = st.checkbox("passed", value=True)
+    with c1:
+        show_failed = st.checkbox("failed", value=True)
+    with c2:
+        show_not_found = st.checkbox("not found", value=False)
     st.divider()
 
     passed_text = st.empty()
@@ -208,6 +233,7 @@ with st.sidebar:
                 st.image(item.reference.get_thumbnail_url())
             else:
                 st.image(item.test.get_thumbnail_url())
+
 
 
 st.write('--------')
