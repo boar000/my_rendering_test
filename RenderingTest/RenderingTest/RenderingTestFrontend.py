@@ -1,6 +1,7 @@
 ﻿
 from email.policy import default
 from turtle import color
+from types import NoneType
 import RenderingTestLib as rt
 import os
 from textwrap import indent
@@ -34,33 +35,76 @@ if "is_initialized" not in st.session_state:
     st.session_state.test_cases = rt.gather_test_cases()
 
     
-# ページ設定（全幅レイアウト）
-st.set_page_config(layout="wide")
 
-# カスタムCSSでパディングをなくす
-st.markdown("""
-    <style>
-    .block-container {
-        padding-top: 0rem;
-        padding-bottom: 0rem;
-        padding-left: 0rem;
-        padding-right: 0rem;
-    }
-    </style>
-""", unsafe_allow_html=True)
 
-st.html(
-    """
-    <style>
-    /* サイドバー全体の幅 */
-    [data-testid="stSidebar"] {
-        min-width: 400px;  /* デフォルトはおよそ 250px */
-        max-width: 120000px;
-    }
-    </style>
-    """
-)
+def style():
+   # ページ設定（全幅レイアウト）
+    st.set_page_config(layout="wide")
 
+    # カスタムCSSでパディングをなくす
+    st.markdown("""
+        <style>
+        .block-container {
+            padding-top: 0rem;
+            padding-bottom: 0rem;
+            padding-left: 0rem;
+            padding-right: 0rem;
+        }
+        </style>
+    """, unsafe_allow_html=True)
+
+    st.html(
+        """
+        <style>
+        /* サイドバー全体の幅 */
+        [data-testid="stSidebar"] {
+            min-width: 400px;  /* デフォルトはおよそ 250px */
+            max-width: 120000px;
+        }
+        </style>
+        """
+    ) 
+
+
+    st.markdown(
+        """
+        <style>
+        /* 全体のフォントサイズ */
+        html, body, [class*="css"] {
+            font-size: 13px !important;
+        }
+
+        /* コンテナ間の余白を縮める */
+        .block-container {
+            padding-top: 0.5rem;
+            padding-bottom: 0.5rem;
+            padding-left: 1rem;
+            padding-right: 1rem;
+        }
+
+        /* 各ウィジェット間の間隔 */
+        .stMarkdown, .stButton, .stDataFrame, .stPlotlyChart, .stImage {
+            margin-bottom: 0.3rem !important;
+        }
+
+        /* ヘッダーや見出しのフォント縮小 */
+        h1, h2, h3, h4 {
+            margin: 0.2em 0 !important;
+            font-size: 90% !important;
+        }
+
+        /* テーブルやデータフレーム */
+        .dataframe td, .dataframe th {
+            padding: 2px 6px !important;
+            font-size: 12px !important;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True
+    )
+
+
+style()
 
 with st.sidebar:
     
@@ -70,6 +114,8 @@ with st.sidebar:
 
 
     test = st.selectbox("Version", tuple(p.name for p in st.session_state.test_cases))
+
+    force_run_test = st.button("(re)run test")
 
     c0, c1 = st.columns(2)
     with c0:
@@ -107,10 +153,12 @@ with st.sidebar:
 
     test = next((x for x in st.session_state.test_cases if x.name == test), None)
     if test != None:
-        if st.session_state.current_test != test:
+        if st.session_state.current_test != test or force_run_test:
             st.session_state.current_test = test
             
-            if os.path.exists(os.path.join(test.raw_folder_path, "report.json")) == True:
+            is_test_result_cached = os.path.exists(os.path.join(test.raw_folder_path, "report.json"))
+
+            if is_test_result_cached and (force_run_test == False):
                 st.session_state.latest_result.reset()
                 st.session_state.latest_result.load(os.path.join(test.raw_folder_path, "report.json"))
                 
@@ -173,6 +221,8 @@ with st.sidebar:
                     itr.empty();
                 for itr in progress_image_place_holders:
                     itr.empty();
+                
+                st.rerun()
 
 
     if option == 'Name':
@@ -217,6 +267,7 @@ with st.sidebar:
     .caption.blue { background-color: #3498db; }
     .caption.green { background-color: #27ae60; }
     .caption.purple { background-color: #9b59b6; }
+    .caption.glay { background-color: #404040; }
     </style>
     """
     
@@ -259,15 +310,23 @@ with st.sidebar:
         if display_type == "Reference":
             disp_image = item.reference
         elif display_type == "Test":
-            if item.test.image != None:    
+            if type(item.test.image) != NoneType:    
                 disp_image = item.test
             else:
                 disp_image = item.reference
 
+        color = ""
+        if is_passed:
+            color = "green"
+        if is_failed:
+            color = "red"
+        if is_not_found:
+            color = "glay"
+
         gallery_html += f"""
             <a href='#' id='{name}'>
                 <div class="gallery-item" onclick="selectItem('cat2')">
-                    <div class="caption">{name}</div>
+                    <div class="caption {color}">{name}</div>
                     <img src="{disp_image.get_thumbnail_url().replace("./static/","http://localhost:8501/app/static/" )}" />
                 </div>
             </a>
