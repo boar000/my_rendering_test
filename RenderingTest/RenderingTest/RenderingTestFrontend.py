@@ -4,7 +4,6 @@ from turtle import color
 from types import NoneType
 import RenderingTestLib as rt
 import os
-from textwrap import indent
 import numpy as np
 import re
 import time
@@ -15,6 +14,7 @@ from datetime import datetime, timedelta
 from collections import defaultdict
 import requests
 from st_click_detector import click_detector
+from PIL import Image
 
 @st.cache_data
 def load_reference_images():
@@ -33,6 +33,7 @@ if "is_initialized" not in st.session_state:
     
     st.session_state.items_by_name = load_reference_images()
     st.session_state.test_cases = rt.gather_test_cases()
+    st.session_state.refresh = False
 
     
 
@@ -153,9 +154,9 @@ with st.sidebar:
 
     test = next((x for x in st.session_state.test_cases if x.name == test), None)
     if test != None:
-        if st.session_state.current_test != test or force_run_test:
+        if st.session_state.current_test != test or force_run_test or st.session_state.refresh == True:
             st.session_state.current_test = test
-            
+            st.session_state.refresh = False
             is_test_result_cached = os.path.exists(os.path.join(test.raw_folder_path, "report.json"))
 
             if is_test_result_cached and (force_run_test == False):
@@ -165,6 +166,7 @@ with st.sidebar:
                 result = st.session_state.latest_result
                 for name, item in st.session_state.items_by_name.items():
                     item.test = rt.ImageObject(date_obj = None, filepath = os.path.join(test.raw_folder_path, name + rt.extension))
+                    item.test.create_thumbnail_if_not_exists()
                     item.result = rt.TestResult.NotFound
                     
                     if name in result.passed:
@@ -222,6 +224,7 @@ with st.sidebar:
                 for itr in progress_image_place_holders:
                     itr.empty();
                 
+                st.session_state.refresh = True
                 st.rerun()
 
 
@@ -310,10 +313,7 @@ with st.sidebar:
         if display_type == "Reference":
             disp_image = item.reference
         elif display_type == "Test":
-            if type(item.test.image) != NoneType:    
-                disp_image = item.test
-            else:
-                disp_image = item.reference
+            disp_image = item.test
 
         color = ""
         if is_passed:
@@ -373,5 +373,11 @@ if st.session_state.current_image in st.session_state.items_by_name.keys():
 
     if item.test.error_map is not None:
         st.image(item.test.error_map, width = image_width)
+    else:
+        flipErrorMap, meanFLIPError, parameters = flip.evaluate(
+            item.reference.get_fullpath(),
+            item.test.get_fullpath(), "LDR")
+        
+        st.image(flipErrorMap)
     
     

@@ -4,7 +4,7 @@
     <SchemaVersion>2.0</SchemaVersion>
     <ProjectGuid>58133ec6-4caf-4e87-96d0-a81dce8ccd84</ProjectGuid>
     <ProjectHome>.</ProjectHome>
-    <StartupFile>RenderingTestLib\__init__.py</StartupFile>
+    <StartupFile>RenderingTestFrontend.py</StartupFile>
     <SearchPath>
     </SearchPath>
     <WorkingDirectory>.</WorkingDirectory>

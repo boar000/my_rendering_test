@@ -9,6 +9,7 @@ import pickle
 from datetime import datetime, timedelta
 from collections import defaultdict
 from enum import Enum
+from PIL import Image
 
 directory = './static/images'
 reference_directory = directory + '/reference'
@@ -39,9 +40,16 @@ class ImageObject:
 
     def load_image(self):
         fullpath = self.get_fullpath()
-        img = cv2.imread(fullpath)
+        
+        img = self.load_cv_image(fullpath)
         self.image = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         self.create_thumbnail_if_not_exists()
+    
+    def load_cv_image(self, fullpath):
+        img_pil = Image.open(fullpath)
+        img_cv = np.array(img_pil)          # RGBA など
+        img_cv = cv2.cvtColor(img_cv, cv2.COLOR_RGBA2BGR)
+        return img_cv
 
     def create_thumbnail_if_not_exists(self):
         thumb_dir = os.path.join(directory, os.path.basename(os.path.dirname(self.get_fullpath())), 'thumbnails')
@@ -51,7 +59,7 @@ class ImageObject:
             os.makedirs(thumb_dir, exist_ok=True)
 
             fullpath = self.get_fullpath()
-            img = cv2.imread(fullpath)
+            img = self.load_cv_image(fullpath)
             cv2.imwrite(dst_path, img)
             
     def get_thumbnail_url(self):
@@ -138,6 +146,9 @@ def gather_test_cases():
                 d = datetime.strptime(date_str, "%Y-%m-%d-%H-%M-%S")
                 
                 test_cases.append(TestCase(name=childdir, raw_folder_path=childdirfull, date=d))
+            elif childdir != 'reference':
+                test_cases.append(TestCase(name=childdir, raw_folder_path=childdirfull, date=datetime.fromordinal(1)))
+                
 
     return test_cases
 
