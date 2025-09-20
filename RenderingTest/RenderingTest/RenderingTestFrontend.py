@@ -15,6 +15,7 @@ from collections import defaultdict
 import requests
 from st_click_detector import click_detector
 from PIL import Image
+import cv2
 
 @st.cache_data
 def load_reference_images():
@@ -36,7 +37,25 @@ if "is_initialized" not in st.session_state:
     st.session_state.refresh = False
 
     
+def show_hdr_image(image : rt.ImageObject, exposure=0.0):
+    try:
+        if image.image is None:
+            image.load_image()
 
+        hdr = image.image.astype(np.float32) / 255.0  # [0,255] → [0,1]
+
+        scale = 2.0 ** exposure
+        img_scaled = np.clip(hdr * scale, 0, 1)  # HDR → [0,1] クリップ
+
+        # ---- トーンマッピング (Reinhard など)
+        ##tonemap = cv2.createTonemapReinhard(gamma=2.2)
+        #ldr = tonemap.process(img_scaled.astype(np.float32))
+        #img_scaled = np.clip(ldr * 255, 0, 255).astype(np.uint8)
+
+        # ---- Streamlit で表示 (RGB順)
+        st.image(img_scaled, width=image_width)
+    except Exception as e:
+        st.write("Error in show_hdr_image: {}".format(e))
 
 def style():
    # ページ設定（全幅レイアウト）
@@ -380,4 +399,7 @@ if st.session_state.current_image in st.session_state.items_by_name.keys():
         
         st.image(flipErrorMap)
     
+    exposure = st.slider("Exposure (EV)", -4.0, 4.0, 0.0, 0.1, width=400)
     
+    show_hdr_image(item.reference, exposure)
+    show_hdr_image(item.test, exposure)
